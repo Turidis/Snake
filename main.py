@@ -37,7 +37,8 @@ def main():
     clock = pygame.time.Clock()
     font_score = pygame.font.SysFont("Arial", 26, bold=True)
     font_end = pygame.font.SysFont("Arial", 66, bold=True)
-
+    img = pygame.image.load('snake.jpg').convert()
+        
     def reset_game():
         x = randrange(0, RES, SIZE)
         y = randrange(0, RES, SIZE)
@@ -53,7 +54,7 @@ def main():
     game_over = False
 
     while True:
-        surface.fill(COLOR_BG)
+        surface.blit(img, (0, 0))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
