@@ -1,79 +1,141 @@
 import pygame
 from random import randrange
+from collections import deque
 
 RES = 800
 SIZE = 50
+MOVE_DELAY = 120
+FPS = 60
 
-x, y = randrange(SIZE, RES - SIZE, SIZE), randrange(SIZE, RES - SIZE, SIZE)
-apple = randrange(SIZE, RES - SIZE, SIZE), randrange(SIZE, RES - SIZE, SIZE)
-length = 1
-snake = [(x, y)]
-dx, dy = 0, 0
-fps = 45
-dirs = {'W': True, 'S': True, 'A': True, 'D': True, }
-score = 0
-speed_count, snake_speed = 0, 10
+COLOR_BG = pygame.Color("black")
+COLOR_SNAKE = pygame.Color("blue")
+COLOR_APPLE = pygame.Color("white")
+COLOR_SCORE = pygame.Color("silver")
+COLOR_GAME_OVER = pygame.Color("red")
 
-pygame.init()
-surface = pygame.display.set_mode([RES, RES])
-clock = pygame.time.Clock()
-font_score = pygame.font.SysFont('Arial', 26, bold=True)
-font_end = pygame.font.SysFont('Arial', 66, bold=True)
-img = pygame.image.load('snake.jpg').convert()
 
-def close_game():
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            exit()
 
-while True:
-    surface.blit(img, (0, 0))
-    #drawing snake, apple
-    [pygame.draw.rect(surface, pygame.Color('blue'), (i, j, SIZE - 1, SIZE - 1)) for i, j in snake]
-    pygame.draw.rect(surface, pygame.Color('white'), (*apple, SIZE, SIZE))
-    #show score
-    render_score = font_score.render(f'SCORE: {score}', 1, pygame.Color('silver'))
-    surface.blit(render_score, (5, 5))
-    #snake movement
-    speed_count += 1
-    if not speed_count % snake_speed:
-        x += dx * SIZE
-        y += dy * SIZE
-        snake.append((x, y))
-        snake = snake[-length:]
-    #eating aple
-    if snake[-1] == apple:
-        apple = randrange(SIZE, RES - SIZE, SIZE), randrange(SIZE, RES - SIZE, SIZE)
-        length += 1
-        score += 1
-        snake_speed -= 1
-        snake_speed = max(snake_speed, 4)
-    #game over
-    if x < 0 or x > RES - SIZE or y < 0 or y > RES - SIZE or len(snake) != len(set(snake)):
-        while True:
-            render_end = font_end.render('GAME OVER', 1, pygame.Color('red'))
-            surface.blit(render_end, (RES // 2 - 200, RES // 3))
+def spawn_apple(snake_set):
+    """Spawn an apple NOT inside the snake."""
+    while True:
+        pos = (
+            randrange(0, RES, SIZE),
+            randrange(0, RES, SIZE),
+        )
+        if pos not in snake_set:
+            return pos
+
+
+def is_opposite(dir1, dir2):
+    """Prevent turning 180 degrees."""
+    return dir1[0] == -dir2[0] and dir1[1] == -dir2[1]
+
+
+def main():
+    pygame.init()
+    surface = pygame.display.set_mode((RES, RES))
+    clock = pygame.time.Clock()
+    font_score = pygame.font.SysFont("Arial", 26, bold=True)
+    font_end = pygame.font.SysFont("Arial", 66, bold=True)
+
+    def reset_game():
+        x = randrange(0, RES, SIZE)
+        y = randrange(0, RES, SIZE)
+        snake = deque([(x, y)])
+        snake_set = {(x, y)}
+        apple = spawn_apple(snake_set)
+        direction = (0, 0)
+        score = 0
+        last_move_time = pygame.time.get_ticks()
+        return snake, snake_set, apple, direction, score, last_move_time
+
+    snake, snake_set, apple, direction, score, last_move_time = reset_game()
+    game_over = False
+
+    while True:
+        surface.fill(COLOR_BG)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    exit()
+
+                if game_over:
+
+                    if event.key == pygame.K_r:
+                        snake, snake_set, apple, direction, score, last_move_time = reset_game()
+                        game_over = False
+                    continue
+
+                if event.key == pygame.K_w:
+                    new_dir = (0, -1)
+                elif event.key == pygame.K_s:
+                    new_dir = (0, 1)
+                elif event.key == pygame.K_a:
+                    new_dir = (-1, 0)
+                elif event.key == pygame.K_d:
+                    new_dir = (1, 0)
+                else:
+                    new_dir = direction
+
+                if not is_opposite(direction, new_dir):
+                    direction = new_dir
+
+        if game_over:
+            text = font_end.render("GAME OVER", True, COLOR_GAME_OVER)
+            surface.blit(text, (RES // 2 - 200, RES // 3))
+            sub = font_score.render("Press R to restart", True, COLOR_SCORE)
+            surface.blit(sub, (RES // 2 - 140, RES // 2))
             pygame.display.flip()
-            close_game()
+            clock.tick(FPS)
+            continue
 
-    pygame.display.flip()
-    clock.tick(fps)
-    close_game()
-    #controls
-    key = pygame.key.get_pressed()
-    if key[pygame.K_w]:
-        if dirs['W']:
-            dx, dy = 0, -1
-            dirs = {'W': True, 'S': False, 'A': True, 'D': True, }
-    elif key[pygame.K_s]:
-        if dirs['S']:
-            dx, dy = 0, 1
-            dirs = {'W': False, 'S': True, 'A': True, 'D': True, }
-    elif key[pygame.K_a]:
-        if dirs['A']:
-            dx, dy = -1, 0
-            dirs = {'W': True, 'S': True, 'A': True, 'D': False, }
-    elif key[pygame.K_d]:
-        if dirs['D']:
-            dx, dy = 1, 0
-            dirs = {'W': True, 'S': True, 'A': False, 'D': True, }
+        now = pygame.time.get_ticks()
+        if direction != (0, 0) and now - last_move_time > MOVE_DELAY:
+            last_move_time = now
+
+            x, y = snake[-1]
+            dx, dy = direction
+            x += dx * SIZE
+            y += dy * SIZE
+
+            if x < 0 or x >= RES or y < 0 or y >= RES:
+                game_over = True
+                continue
+
+            new_head = (x, y)
+
+
+            if new_head in snake_set:
+                game_over = True
+                continue
+
+
+            snake.append(new_head)
+            snake_set.add(new_head)
+
+
+            if new_head == apple:
+                score += 1
+                apple = spawn_apple(snake_set)
+            else:
+
+                tail = snake.popleft()
+                snake_set.remove(tail)
+                
+        for pos in snake:
+            pygame.draw.rect(surface, COLOR_SNAKE, (*pos, SIZE - 1, SIZE - 1))
+
+        pygame.draw.rect(surface, COLOR_APPLE, (*apple, SIZE, SIZE))
+
+        text = font_score.render(f"Score: {score}", True, COLOR_SCORE)
+        surface.blit(text, (5, 5))
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+if __name__ == "__main__":
+    main()
